@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "LVGL: configure",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["-S", "${workspaceFolder}", "-B", "${workspaceFolder}/build", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"],
+      "problemMatcher": []
+    },
+    {
+      "label": "LVGL: build",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/build", "--parallel"],
+      "dependsOn": "LVGL: configure",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "LVGL: run emulator",
+      "type": "shell",
+      "command": "${workspaceFolder}/build/tiny-guy-sim",
+      "dependsOn": "LVGL: build",
+      "problemMatcher": []
+    }
+  ]
+}
+
