@@ -9,6 +9,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 find_package(PkgConfig REQUIRED)
+find_package(Threads REQUIRED)
 pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
 
 # Keep the simulator on LVGL 8.3, matching the intended ESP32 firmware API.
@@ -30,13 +31,16 @@ target_link_libraries(lvgl_sdl PUBLIC lvgl PkgConfig::SDL2)
 add_executable(tiny-guy-sim
     src/main.c
     src/ui.c
-    src/components/page_indicator.c
+    src/components/usage_bar.c
     src/components/page_shell.c
     src/pages/status_page.c
     src/pages/usage_page.c
+    src/services/claude_usage.c
+    src/services/codex_usage.c
+    src/services/cursor_usage.c
 )
 target_include_directories(tiny-guy-sim PRIVATE config src)
-target_link_libraries(tiny-guy-sim PRIVATE lvgl_sdl)
+target_link_libraries(tiny-guy-sim PRIVATE lvgl_sdl Threads::Threads m)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(tiny-guy-sim PRIVATE -Wall -Wextra -Wpedantic)

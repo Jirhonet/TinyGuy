@@ -1,5 +1,4 @@
 #include "pages/status_page.h"
-#include "components/page_indicator.h"
 #include "components/page_shell.h"
 
 lv_obj_t *status_page_create(lv_obj_t *parent)
@@ -35,6 +34,5 @@ lv_obj_t *status_page_create(lv_obj_t *parent)
     lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(hint, lv_color_hex(0x747B90), 0);
 
-    page_indicator_create(content, 0, 2);
     return lv_obj_get_parent(content);
 }
