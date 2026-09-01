@@ -33,7 +33,7 @@ add_executable(tiny-guy-sim
     src/ui.c
     src/components/usage_bar.c
     src/components/page_shell.c
-    src/pages/status_page.c
+    src/pages/agent_page.c
     src/pages/usage_page.c
     src/services/claude_usage.c
     src/services/codex_usage.c

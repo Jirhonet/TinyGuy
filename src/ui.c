@@ -1,13 +1,13 @@
 #include "ui.h"
 #include "lvgl.h"
-#include "pages/status_page.h"
+#include "pages/agent_page.h"
 #include "pages/usage_page.h"
 
 enum {
     LEADING_USAGE_PAGE,
-    STATUS_PAGE,
+    AGENT_PAGE,
     USAGE_PAGE,
-    TRAILING_STATUS_PAGE,
+    TRAILING_AGENT_PAGE,
     CAROUSEL_PAGE_COUNT
 };
 
@@ -35,7 +35,7 @@ static void carousel_scroll_ended(lv_event_t *event)
         repositioning = false;
     } else if (scroll_x > page_width * 5 / 2) {
         repositioning = true;
-        lv_obj_scroll_to_x(carousel, page_width * STATUS_PAGE, LV_ANIM_OFF);
+        lv_obj_scroll_to_x(carousel, page_width * AGENT_PAGE, LV_ANIM_OFF);
         repositioning = false;
     }
 }
@@ -60,10 +60,10 @@ void ui_create(void)
                         LV_EVENT_SCROLL_END, NULL);
 
     carousel_pages[LEADING_USAGE_PAGE] = usage_page_create(carousel);
-    carousel_pages[STATUS_PAGE] = status_page_create(carousel);
+    carousel_pages[AGENT_PAGE] = agent_page_create(carousel);
     carousel_pages[USAGE_PAGE] = usage_page_create(carousel);
-    carousel_pages[TRAILING_STATUS_PAGE] = status_page_create(carousel);
+    carousel_pages[TRAILING_AGENT_PAGE] = agent_page_create(carousel);
 
     lv_obj_update_layout(carousel);
-    lv_obj_scroll_to_view(carousel_pages[STATUS_PAGE], LV_ANIM_OFF);
+    lv_obj_scroll_to_view(carousel_pages[AGENT_PAGE], LV_ANIM_OFF);
 }
