@@ -27,7 +27,14 @@ target_include_directories(lvgl_sdl PUBLIC
 )
 target_link_libraries(lvgl_sdl PUBLIC lvgl PkgConfig::SDL2)
 
-add_executable(tiny-guy-sim src/main.c src/ui.c)
+add_executable(tiny-guy-sim
+    src/main.c
+    src/ui.c
+    src/components/page_indicator.c
+    src/components/page_shell.c
+    src/pages/status_page.c
+    src/pages/usage_page.c
+)
 target_include_directories(tiny-guy-sim PRIVATE config src)
 target_link_libraries(tiny-guy-sim PRIVATE lvgl_sdl)
 
