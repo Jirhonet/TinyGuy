@@ -5,6 +5,7 @@ A ESP32 smart display that displays a 'tiny guy' working when your AI agents are
 ## Features
 
 - Displays a 'tiny guy' working when your AI agents are working.
+- Falls asleep after three minutes without activity and wakes when tapped.
 - Shows usage left for your AI agents.
 - Support for Claude Code, Codex and Cursor.
 
