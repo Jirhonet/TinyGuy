@@ -1,12 +1,14 @@
 #include "ui.h"
 #include "lvgl.h"
 #include "pages/agent_page.h"
+#include "pages/usage_dials_page.h"
 #include "pages/usage_page.h"
 
 enum {
-    LEADING_USAGE_PAGE,
+    LEADING_DIALS_PAGE,
     AGENT_PAGE,
     USAGE_PAGE,
+    DIALS_PAGE,
     TRAILING_AGENT_PAGE,
     CAROUSEL_PAGE_COUNT
 };
@@ -31,9 +33,9 @@ static void carousel_scroll_ended(lv_event_t *event)
 
     if (scroll_x < page_width / 2) {
         repositioning = true;
-        lv_obj_scroll_to_x(carousel, page_width * USAGE_PAGE, LV_ANIM_OFF);
+        lv_obj_scroll_to_x(carousel, page_width * DIALS_PAGE, LV_ANIM_OFF);
         repositioning = false;
-    } else if (scroll_x > page_width * 5 / 2) {
+    } else if (scroll_x > page_width * 7 / 2) {
         repositioning = true;
         lv_obj_scroll_to_x(carousel, page_width * AGENT_PAGE, LV_ANIM_OFF);
         repositioning = false;
@@ -59,9 +61,10 @@ void ui_create(void)
     lv_obj_add_event_cb(carousel, carousel_scroll_ended,
                         LV_EVENT_SCROLL_END, NULL);
 
-    carousel_pages[LEADING_USAGE_PAGE] = usage_page_create(carousel);
+    carousel_pages[LEADING_DIALS_PAGE] = usage_dials_page_create(carousel);
     carousel_pages[AGENT_PAGE] = agent_page_create(carousel);
     carousel_pages[USAGE_PAGE] = usage_page_create(carousel);
+    carousel_pages[DIALS_PAGE] = usage_dials_page_create(carousel);
     carousel_pages[TRAILING_AGENT_PAGE] = agent_page_create(carousel);
 
     lv_obj_update_layout(carousel);

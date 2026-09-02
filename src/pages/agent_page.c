@@ -3,7 +3,7 @@
 #include "services/agent_status.h"
 
 #ifndef AGENT_SLEEP_TIMEOUT_MS
-#define AGENT_SLEEP_TIMEOUT_MS (60U * 1000U / 6U)
+#define AGENT_SLEEP_TIMEOUT_MS (3U * 60U * 1000U)
 #endif
 
 enum {
@@ -19,9 +19,15 @@ enum {
     WRITING_LINE_HEIGHT = 27,
     WRITING_LINE_COUNT = 4,
     INK_OFFSET_Y = 110,
+    PEN_WIGGLE_DEGREES = 3,
+    PEN_WIGGLE_PERIOD_MS = 180,
     FALL_ASLEEP_DURATION = 3500,
     DROWSY_EYE_LENGTH = 22,
-    WAKE_UP_DURATION = 850,
+    WAKE_BLINK_CLOSE_DURATION = 160,
+    WAKE_OPEN_DURATION = 110,
+    WAKE_HOLD_DURATION = 220,
+    WAKE_SETTLE_DURATION = 420,
+    SHOCKED_EYE_LENGTH = 84,
     EYE_DRAW_WIDTH = 80,
     EYE_DRAW_HEIGHT = 112,
 };
@@ -63,9 +69,11 @@ typedef struct {
     uint32_t state_started;
     uint8_t sleep_blinks_remaining;
     bool sleep_blinking;
+    uint8_t wake_phase;
+    bool work_after_waking;
 } agent_face_t;
 
-static const uint16_t sleep_close_durations[] = {900, 1400, 1900, 2400};
+static const uint16_t sleep_close_durations[] = {900, 1400, 2400};
 
 static int32_t interpolate(int32_t from, int32_t to, uint32_t elapsed,
                            uint32_t duration)
@@ -163,7 +171,8 @@ static void draw_squiggle(lv_draw_ctx_t *draw_context, lv_coord_t center_x,
     }
 }
 
-static void draw_pen(lv_draw_ctx_t *draw_context, lv_coord_t x, lv_coord_t y)
+static void draw_pen(lv_draw_ctx_t *draw_context, lv_coord_t tip_x,
+                     lv_coord_t tip_y, int32_t free_end_angle)
 {
     lv_draw_line_dsc_t pen;
     lv_draw_line_dsc_init(&pen);
@@ -173,9 +182,16 @@ static void draw_pen(lv_draw_ctx_t *draw_context, lv_coord_t x, lv_coord_t y)
     pen.round_start = true;
     pen.round_end = true;
 
-    lv_point_t nib = {x, y};
-    lv_point_t end = {x + 19, y - 24};
-    lv_draw_line(draw_context, &pen, &nib, &end);
+    /* Keep the writing tip fixed and rotate only the free end around it. */
+    int32_t normalized_angle = (free_end_angle + 360) % 360;
+    int32_t sine = lv_trigo_sin(normalized_angle);
+    int32_t cosine = lv_trigo_sin((normalized_angle + 90) % 360);
+    lv_point_t writing_tip = {tip_x, tip_y};
+    lv_point_t free_end = {
+        tip_x + ((19 * cosine + 24 * sine) >> LV_TRIGO_SHIFT),
+        tip_y + ((19 * sine - 24 * cosine) >> LV_TRIGO_SHIFT),
+    };
+    lv_draw_line(draw_context, &pen, &writing_tip, &free_end);
 }
 
 static void draw_face(lv_event_t *event)
@@ -196,8 +212,16 @@ static void draw_face(lv_event_t *event)
                           face->writing_line * WRITING_LINE_HEIGHT + INK_OFFSET_Y,
                       face->x);
     }
-    if (face->running)
-        draw_pen(draw_context, center_x, center_y + INK_OFFSET_Y);
+    if (face->running) {
+        int32_t pen_angle = 0;
+        if (!face->returning_to_margin) {
+            int32_t phase = (lv_tick_get() % PEN_WIGGLE_PERIOD_MS) * 360 /
+                            PEN_WIGGLE_PERIOD_MS;
+            pen_angle = PEN_WIGGLE_DEGREES * lv_trigo_sin(phase) >>
+                        LV_TRIGO_SHIFT;
+        }
+        draw_pen(draw_context, center_x, center_y + INK_OFFSET_Y, pen_angle);
+    }
 
 }
 
@@ -206,7 +230,23 @@ static void wake_up(agent_face_t *face, uint32_t now)
     face->state = FACE_WAKING;
     face->state_started = now;
     face->eyes_closed = false;
-    begin_animation(face, 0, -18, 0, EYE_LENGTH, WAKE_UP_DURATION);
+    face->wake_phase = 0;
+    /* Reverse the final falling-asleep close first: gradually lift the eyes
+       from fully closed back to their drowsy shape. */
+    begin_animation(face, 0, 30, 0, DROWSY_EYE_LENGTH,
+                    sleep_close_durations[2]);
+}
+
+static void start_working(agent_face_t *face, uint32_t now)
+{
+    face->running = true;
+    face->work_after_waking = false;
+    face->state = FACE_IDLE;
+    face->writing_line = 0;
+    face->returning_to_margin = true;
+    begin_animation(face, WRITING_LEFT, WRITING_TOP, -6,
+                    EYE_LENGTH, 250);
+    face->next_action = now + 300;
 }
 
 static void face_tapped(lv_event_t *event)
@@ -225,22 +265,25 @@ static void face_tick(lv_timer_t *timer)
     uint32_t now = lv_tick_get();
     bool running = agent_is_running();
 
-    if (running != face->running) {
-        face->running = running;
+    if (running && !face->running && !face->work_after_waking) {
+        face->eyes_closed = false;
+        face->last_activity = now;
+        if (face->state == FACE_FALLING_ASLEEP ||
+            face->state == FACE_SLEEPING) {
+            face->work_after_waking = true;
+            wake_up(face, now);
+        } else {
+            start_working(face, now);
+        }
+    } else if (!running && (face->running || face->work_after_waking)) {
+        face->running = false;
+        face->work_after_waking = false;
         face->eyes_closed = false;
         face->last_activity = now;
         face->state = FACE_IDLE;
-        if (running) {
-            face->writing_line = 0;
-            face->returning_to_margin = true;
-            begin_animation(face, WRITING_LEFT, WRITING_TOP, -6,
-                            EYE_LENGTH, 250);
-            face->next_action = now + 300;
-        } else {
-            face->returning_to_margin = false;
-            begin_animation(face, 0, 0, 0, EYE_LENGTH, 250);
-            face->next_action = now + 400;
-        }
+        face->returning_to_margin = false;
+        begin_animation(face, 0, 0, 0, EYE_LENGTH, 250);
+        face->next_action = now + 400;
     }
 
     uint32_t elapsed = now - face->animation_started;
@@ -259,7 +302,7 @@ static void face_tick(lv_timer_t *timer)
         now - face->last_activity >= AGENT_SLEEP_TIMEOUT_MS) {
         face->state = FACE_FALLING_ASLEEP;
         face->state_started = now;
-        face->sleep_blinks_remaining = 4;
+        face->sleep_blinks_remaining = 3;
         face->sleep_blinking = false;
         face->eyes_closed = false;
         begin_animation(face, 0, 30, 0, DROWSY_EYE_LENGTH,
@@ -293,7 +336,7 @@ static void face_tick(lv_timer_t *timer)
                     face->next_action = now + 320;
                 }
             } else {
-                uint8_t close_index = 4 - face->sleep_blinks_remaining;
+                uint8_t close_index = 3 - face->sleep_blinks_remaining;
                 uint32_t close_duration =
                     sleep_close_durations[close_index];
                 face->sleep_blinks_remaining--;
@@ -317,10 +360,40 @@ static void face_tick(lv_timer_t *timer)
     }
 
     if (face->state == FACE_WAKING) {
-        if (now - face->state_started >= WAKE_UP_DURATION) {
-            face->state = FACE_IDLE;
-            begin_animation(face, 0, 0, 0, EYE_LENGTH, 280);
-            face->next_action = now + 650;
+        if (elapsed >= face->animation_duration) {
+            face->wake_phase++;
+            switch (face->wake_phase) {
+            case 1: /* Close quickly, reversing the sleep-time reopening. */
+                begin_animation(face, 0, 34, 0, EYE_BLINK_LENGTH,
+                                WAKE_BLINK_CLOSE_DURATION);
+                break;
+            case 2: /* One slow blink opens, mirroring the 1400 ms close. */
+                begin_animation(face, 0, 30, 0, DROWSY_EYE_LENGTH,
+                                sleep_close_durations[1]);
+                break;
+            case 3: /* Snap into the surprised expression. */
+                begin_animation(face, 0, -28, 0, SHOCKED_EYE_LENGTH,
+                                WAKE_OPEN_DURATION);
+                break;
+            case 4: /* Hold the shocked eyes for a beat. */
+                begin_animation(face, 0, -28, 0, SHOCKED_EYE_LENGTH,
+                                WAKE_HOLD_DURATION);
+                break;
+            case 5:
+                begin_animation(face, 0, -18, 0, EYE_LENGTH,
+                                WAKE_SETTLE_DURATION);
+                break;
+            default:
+                if (face->work_after_waking && running) {
+                    start_working(face, now);
+                } else {
+                    face->work_after_waking = false;
+                    face->state = FACE_IDLE;
+                    begin_animation(face, 0, 0, 0, EYE_LENGTH, 280);
+                    face->next_action = now + 650;
+                }
+                break;
+            }
         }
         lv_obj_invalidate(face->surface);
         return;
