@@ -67,6 +67,7 @@ static void delete_usage_view(lv_event_t *event)
 lv_obj_t *usage_page_create(lv_obj_t *parent)
 {
     lv_obj_t *content = page_shell_create(parent, lv_color_black(), 12);
+    lv_obj_set_style_pad_all(content, 8, 0);
 
     usage_view_t *view = calloc(1, sizeof(*view));
 

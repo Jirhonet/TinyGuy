@@ -36,6 +36,7 @@ add_executable(tiny-guy-sim
     src/pages/agent_page.c
     src/pages/usage_page.c
     src/services/claude_usage.c
+    src/services/agent_status.c
     src/services/codex_usage.c
     src/services/cursor_usage.c
 )
